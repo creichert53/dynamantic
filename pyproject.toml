@@ -1,0 +1,35 @@
+[project]
+name = "dynamantic"
+version = "0.1.0"
+description = "A Pydantic ORM for DynamoDB on top of boto3."
+authors = [{ name = "chrisreichert53", email = "creichert.53@gmail.com" }]
+requires-python = ">=3.10"
+readme = "README.md"
+license = { text = "MIT" }
+dependencies = [
+    "pydantic>=2.4.2",
+    "boto3>=1.28.63",
+    "boto3-stubs[dynamodb]>=1.28.63",
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "pytest>=7.4.2",
+    "moto[dynamodb]>=4.2.6",
+    "black>=23.9.1",
+    "pylint>=3.0.1",
+    "pytest-dotenv>=0.5.2",
+    "pytest-cov>=4.1.0",
+]
+
+[tool.black]
+line-length = 120
+
+[tool.pdm.scripts]
+test-cov = "pytest --cov"
+report-cov = "coverage report -m"
+test = { composite = ["test-cov", "report-cov"] }

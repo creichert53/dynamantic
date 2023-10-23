@@ -1,0 +1,73 @@
+{
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[python]": {
+    "editor.formatOnType": true,
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
+  },
+  "banner-comments-plus.commentStyle": "line",
+  "banner-comments-plus.favorites": ["ANSI Shadow"],
+  "banner-comments-plus.perLinePrefix": "",
+  "editor.formatOnSave": true,
+  "editor.tokenColorCustomizations": {
+    "comments": "#2fd44d",
+    "[Community Material Theme Darker]": {
+      "textMateRules": [
+        {
+          "scope": "string.quoted.docstring.multi.python",
+          "settings": {
+            "foreground": "#2fd44d"
+          }
+        }
+      ]
+    }
+  },
+  "errorLens.enabled": true,
+  "errorLens.enabledDiagnosticLevels": ["info", "warning", "error"],
+  "files.associations": {
+    "*.html": "jinja-html",
+    ".env*": "dotenv"
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.hg/store/**": true
+  },
+  "json.schemaDownload.enable": true,
+  "material-icon-theme.activeIconPack": "react_redux",
+  "material-icon-theme.files.associations": {
+    ".env.local.uvicorn": "tune",
+    "**.html": "html",
+    ".pdm-python": "../../icons/pdm",
+    "pyproject.toml": "../../icons/pdm"
+  },
+  "material-icon-theme.folders.associations": {
+    "devops": "admin",
+    "cdk": "dist",
+    ".database": "database"
+  },
+  "python.defaultInterpreterPath": "./.venv/bin/python",
+  "window.zoomLevel": -1,
+  "workbench.colorTheme": "Community Material Theme Darker",
+  "workbench.iconTheme": "material-icon-theme",
+  "search.useIgnoreFiles": false,
+  "search.exclude": {
+    "**/node_modules": false
+  }
+}
