@@ -427,7 +427,7 @@ disable=raw-checker-failed,
         use-symbolic-message-instead,
         too-few-public-methods,
         too-many-instance-attributes,
-        C0111,W0703,W0106,C0116,E1131,W0511,C0121
+        C0111,W0703,W0106,C0116,E1131,W0511,C0121, R0911
 
 
 # Enable the message, report, category or checker with the given id(s). You can

@@ -3,7 +3,7 @@ import enum
 import datetime
 from uuid import uuid4
 from decimal import Decimal
-from typing import Any, List, Optional, Set, FrozenSet, NamedTuple, TypedDict
+from typing import Any, List, Optional, Set, FrozenSet, Type, NamedTuple, TypedDict, TypeVar, Generic
 
 import pytest
 from pytest import Config
@@ -13,6 +13,7 @@ from moto import mock_dynamodb
 
 from pydantic import Field, BaseModel
 from dynamantic import Dynamantic, GlobalSecondaryIndex, LocalSecondaryIndex
+from dynamantic.main import T
 from dotenv import load_dotenv
 
 load_dotenv(".env.test")
@@ -124,7 +125,7 @@ class LSIModel(RangeKeyModel):
     __lsi__ = [LSI]
 
 
-def _create_item_raw(DynamanticModel: Dynamantic = None, **kwargs) -> Dynamantic:
+def _create_item_raw(DynamanticModel: Type[T] = None, **kwargs) -> T:
     data = {
         "my_simple_bool": True,
         "my_simple_bytes": b"foo",
@@ -166,14 +167,14 @@ def _create_item_raw(DynamanticModel: Dynamantic = None, **kwargs) -> Dynamantic
         return BaseModel(**data)
 
 
-def _create_item(DynamanticModel: Dynamantic, **kwargs) -> Dynamantic:
+def _create_item(DynamanticModel: Type[T], **kwargs) -> T:
     tables = DynamanticModel._dynamodb().list_tables()["TableNames"]
     if DynamanticModel.__table_name__ not in tables:
         DynamanticModel.create_table()
     return _create_item_raw(DynamanticModel, **kwargs)
 
 
-def _save_items(DynamanticModel, add_all: bool = False):
+def _save_items(DynamanticModel, add_count: int = None):
     item1: DynamanticModel = _create_item(
         DynamanticModel,
         item_id="hello:world",
@@ -198,8 +199,8 @@ def _save_items(DynamanticModel, add_all: bool = False):
     )
     item3.save()
 
-    if add_all:
-        for x in range(50):
+    if add_count is not None:
+        for x in range(add_count):
             item: DynamanticModel = _create_item(
                 DynamanticModel,
                 item_id="hello:world",

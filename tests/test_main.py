@@ -48,12 +48,12 @@ def test_pydantic_type_decimal():
 
 # my_tuple: tuple
 def test_serializer_tuple(serialized):
-    assert serialized.get("my_tuple").__class__ == list
+    assert serialized.get("my_tuple").__class__ == tuple
 
 
 # my_frozenset: frozenset
 def test_serializer_frozenset(serialized):
-    assert serialized.get("my_frozenset").__class__ == list
+    assert serialized.get("my_frozenset").__class__ == frozenset
 
 
 # my_enum: enum.Enum
@@ -124,19 +124,19 @@ def test_serializer_optional_decimal(serialized):
 
 # my_str_set: Optional[Set[str]] = None
 def test_serializer_optional_str_set(serialized):
-    assert serialized.get("my_str_set").__class__ == list
+    assert serialized.get("my_str_set").__class__ == set
     assert next(iter(serialized.get("my_str_set"))).__class__ == str
 
 
 # my_bytes_set: Optional[Set[bytes]] = None
 def test_serializer_optional_bytes_set(serialized):
-    assert serialized.get("my_bytes_set").__class__ == list
+    assert serialized.get("my_bytes_set").__class__ == set
     assert next(iter(serialized.get("my_bytes_set"))).__class__ == bytes
 
 
 # my_int_set: Optional[Set[int]] = None
 def test_serializer_optional_int_set(serialized):
-    assert serialized.get("my_int_set").__class__ == list
+    assert serialized.get("my_int_set").__class__ == set
     assert next(iter(serialized.get("my_int_set"))).__class__ == int
 
 

@@ -17,9 +17,7 @@ class DynamanticException(Exception):
     A common exception class
     """
 
-    def __init__(
-        self, msg: Optional[str] = None, cause: Optional[Exception] = None
-    ) -> None:
+    def __init__(self, msg: Optional[str] = None, cause: Optional[Exception] = None) -> None:
         self.msg = msg if msg is not None else self.msg
         self.cause = cause
         super().__init__(self.msg)
@@ -125,11 +123,7 @@ class CancellationReason:
         self.message = message
 
     def __eq__(self, other: Any) -> bool:
-        return (
-            isinstance(other, CancellationReason)
-            and self.code == other.code
-            and self.message == other.message
-        )
+        return isinstance(other, CancellationReason) and self.code == other.code and self.message == other.message
 
 
 class TransactWriteError(DynamanticException):
@@ -183,6 +177,16 @@ class InvalidStateError(DynamanticException):
     """
 
     msg = "Operation in invalid state"
+
+
+class AttributeTypeInvalidError(TypeError):
+    """
+    Raised when attribute type is invalid
+    """
+
+    def __init__(self, attr_type: str, compatible_types: str):
+        msg = f"{attr_type} input not compatible with {compatible_types}"
+        super().__init__(msg)
 
 
 class AttributeDeserializationError(TypeError):

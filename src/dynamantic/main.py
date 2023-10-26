@@ -1,13 +1,12 @@
-from decimal import Decimal
-
+from decimal import Decimal, ROUND_HALF_UP
 
 import inspect
 import typing
-from typing import Callable, List, Literal, Set, Type, Dict
+from typing import Callable, List, Literal, Set, Type, Dict, Any, TypeVar, Generic
 from datetime import datetime, time, date
 
 import boto3
-from boto3.dynamodb.types import Binary
+from boto3.dynamodb.types import Binary, TypeSerializer
 from boto3.dynamodb.conditions import (
     ComparisonCondition,
     ConditionExpressionBuilder,
@@ -35,6 +34,58 @@ from .exceptions import PutError, GetError, TableError, InvalidStateError
 
 BOTOCORE_EXCEPTIONS = (BotoCoreError, ClientError)
 
+T = TypeVar("T", bound="Dynamantic")
+M = TypeVar("M", bound="_DynamanticFuture")
+
+
+def type_serialize(key: str, value) -> Dict[str, Dict[str, Any]]:
+    return {key: TypeSerializer().serialize(dynamodb_compatible_value(value))}
+
+
+def dynamodb_compatible_value(val):
+    if isinstance(val, Binary):
+        return Binary(val)
+    if isinstance(val, float):
+        val = Decimal(val)
+        return val.quantize(Decimal("0.0000000000"), rounding=ROUND_HALF_UP)
+    if isinstance(val, (datetime, date, time)):
+        return val.isoformat()
+    if isinstance(val, dict):
+        return serialize_map(val)
+    return val
+
+
+def serialize_map(values: dict):
+    for k in values.keys():
+        v = values[k]
+        original = v
+        if isinstance(v, float):
+            v = Decimal(v)
+        if isinstance(v, (datetime, date, time)):
+            v = v.isoformat()
+        if isinstance(v, dict):
+            serialize_map(v)
+        if isinstance(v, (tuple, frozenset)):
+            # convert to list, which will be serialized next, converted back at the end
+            v = list(v)
+        if isinstance(v, set):
+            new_set = set()
+            for val in v:
+                new_set.add(dynamodb_compatible_value(val))
+            # convert to list, which will be serialized next, converted back at the end
+            v = list(new_set)
+        if isinstance(v, list):
+            for x, val in enumerate(v):
+                if isinstance(val, (float, datetime, date, time)):
+                    v[x] = dynamodb_compatible_value(val)
+                if isinstance(val, dict):
+                    serialize_map(val)
+        if isinstance(original, (tuple, frozenset, set)):
+            v = original.__class__(v)
+        if isinstance(v, Dynamantic):
+            serialize_map(v.model_dump())
+        values[k] = v
+
 
 class _TableMetadata:
     __table_name__: str | Callable[[], str]
@@ -58,80 +109,6 @@ class _TableMetadata:
 
 
 class Dynamantic(_TableMetadata, BaseModel):
-    @classmethod
-    def _prepare_operation(
-        cls,
-        value: str | None = None,
-        index: GlobalSecondaryIndex | LocalSecondaryIndex | None = None,
-        range_key_condition: ComparisonCondition | None = None,
-        filter_condition: ComparisonCondition | None = None,
-        attributes_to_get: List[str] | None = None,
-    ):
-        params: QueryInputRequestTypeDef = {}
-
-        expression: ComparisonCondition = (
-            (K(cls.__hash_key__).eq(value) & range_key_condition)
-            if range_key_condition
-            else K(cls.__hash_key__).eq(value)
-        )
-
-        if index:
-            if index in cls.__gsi__ + cls.__lsi__:
-                params["IndexName"] = index.index_name
-                expression = (
-                    (K(index.hash_key).eq(value) & range_key_condition)
-                    if range_key_condition
-                    else K(index.hash_key).eq(value)
-                )
-            else:
-                raise InvalidStateError("Index provided but index does not exist for model.")
-
-        params["KeyConditionExpression"] = expression
-
-        if filter_condition:
-            params["FilterExpression"] = filter_condition
-
-        if attributes_to_get and len(attributes_to_get) > 0:
-            keys = [cls.__hash_key__]
-            if cls.__range_key__:
-                keys.append(cls.__range_key__)
-            params["ProjectionExpression"] = ", ".join(keys + attributes_to_get)
-
-        return params
-
-    @classmethod
-    def scan(
-        cls,
-        filter_condition: ComparisonCondition | None = None,
-        index: GlobalSecondaryIndex | LocalSecondaryIndex | None = None,
-        attributes_to_get: List[str] | None = None,
-        as_dict: bool = False,
-    ):
-        params = cls._prepare_operation(
-            "", index=index, filter_condition=filter_condition, attributes_to_get=attributes_to_get
-        )
-
-        del params["KeyConditionExpression"]
-
-        result: ScanOutputTypeDef = cls._dynamodb_table().scan(**params)
-        items = [cls._return_value(item, as_dict) for item in result["Items"]]
-        return items
-
-    @classmethod
-    def query(
-        cls,
-        value: str,
-        index: GlobalSecondaryIndex | LocalSecondaryIndex | None = None,
-        range_key_condition: ComparisonCondition | None = None,
-        filter_condition: ComparisonCondition | None = None,
-        attributes_to_get: List[str] | None = None,
-        as_dict: bool = False,
-    ):
-        params = cls._prepare_operation(value, index, range_key_condition, filter_condition, attributes_to_get)
-        result: QueryOutputTableTypeDef = cls._dynamodb_table().query(**params)
-        items = [cls._return_value(item, as_dict) for item in result["Items"]]
-        return items
-
     def save(self, condition_expression: ComparisonCondition | None = None):
         payload = {
             "TableName": self.__table_name__,
@@ -152,7 +129,80 @@ class Dynamantic(_TableMetadata, BaseModel):
             raise PutError(f"Failed to put item: {exc}", exc) from exc
 
     @classmethod
-    def get(cls, hash_key: str, range_key: str | None = None, as_dict: bool = False):
+    def scan(
+        cls: Type[T],
+        filter_condition: ComparisonCondition | None = None,
+        index: GlobalSecondaryIndex | LocalSecondaryIndex | None = None,
+        attributes_to_get: List[str] | None = None,
+    ) -> List[T]:
+        """Perform a scan of DynamoDB.
+
+        Args:
+            filter_condition (ComparisonCondition, optional):
+
+                    Filter the scan using a condition expression. Defaults to None.
+            index (GlobalSecondaryIndex | LocalSecondaryIndex, optional):
+                    Provide an index to scan. Defaults to None.
+
+            attributes_to_get (List[str], optional):
+                    List of attributes to get. Any required fields in the model will be returned as well.
+                    Defaults to None.
+
+        Returns:
+            List[T]: List of model instances.
+        """
+        params = cls._prepare_operation(
+            "", index=index, filter_condition=filter_condition, attributes_to_get=attributes_to_get
+        )
+
+        del params["KeyConditionExpression"]
+
+        result: ScanOutputTypeDef = cls._dynamodb_table().scan(**params)
+        items = [cls._return_value(item) for item in result["Items"]]
+        return items
+
+    @classmethod
+    def query(
+        cls: Type[T],
+        value: str,
+        range_key_condition: ComparisonCondition | None = None,
+        filter_condition: ComparisonCondition | None = None,
+        index: GlobalSecondaryIndex | LocalSecondaryIndex | None = None,
+        attributes_to_get: List[str] | None = None,
+    ) -> List[T]:
+        """Perform a query of DynamoDB.
+
+        Args:
+            value (str):
+                    The hash key value to query for.
+                    The hash key for the table if no index, or the index if provided.
+
+            range_key_condition (ComparisonCondition, optional):
+                    The condition expression to use on the range key this is required if the table
+                    or index you query on contains a range key. Defaults to None.
+
+            filter_condition (ComparisonCondition, optional):
+                    Filter the query using a condition expression. Defaults to None.
+
+            index (GlobalSecondaryIndex | LocalSecondaryIndex, optional):
+                    Provide an index to scan. Defaults to None.
+
+            attributes_to_get (List[str], optional):
+                    List of attributes to get. Any required fields in the model will
+                    be returned as well. Defaults to None.
+
+        Returns:
+            List[T]: List of model instances.
+        """
+        params = cls._prepare_operation(value, index, range_key_condition, filter_condition, attributes_to_get)
+        print(cls._dynamodb().scan(TableName=cls.__table_name__))
+        result: QueryOutputTableTypeDef = cls._dynamodb_table().query(**params)
+        print(result)
+        items = [cls._return_value(item) for item in result["Items"]]
+        return items
+
+    @classmethod
+    def get(cls: Type[T], hash_key: str, range_key: str | None = None) -> T:
         params = {}
         params[cls.__hash_key__] = hash_key
         if cls.__range_key__:
@@ -169,17 +219,18 @@ class Dynamantic(_TableMetadata, BaseModel):
         if item == {}:
             raise GetError("Item doesn't exist.")
 
-        return cls._return_value(item, as_dict)
+        return cls._return_value(item)
 
-    def refresh(self):
+    def refresh(self: T) -> T:
+        """Refresh the model from the database."""
         item = self.model_dump()
         item = (
             self.get(item[self.__hash_key__], item[self.__range_key__])
             if self.__range_key__
             else self.get(item[self.__hash_key__])
         )
-        # item = self.deserialize(item)
-        self.__dict__.update(item)
+        self.from_raw_data(item)
+        return self
 
     @classmethod
     def create_table(cls, wait: bool = True):
@@ -260,12 +311,73 @@ class Dynamantic(_TableMetadata, BaseModel):
             raise TableError(f"Failed to create table: {exc}", exc) from exc
 
     @classmethod
-    def delete_table(cls):
+    def delete_table(cls) -> None:
         cls._dynamodb_table().delete()
 
+    def from_raw_data(self, item: Dict[str, Any]) -> None:
+        self.__dict__.update(item)
+
     @classmethod
-    def _return_value(cls, item: dict, as_dict: bool = False):
-        return cls.deserialize(item) if as_dict else cls(**cls.deserialize(item))
+    def _required_fields(cls, blacklist: List[str] = None) -> List[str]:
+        """Return the fields required for this model. Optionally, provide other attributes
+        to blacklist in the return list.
+
+        Args:
+            blacklist (List[str]): List of attributes to leave out of the return list.
+
+        Returns:
+            List[str]: List of required fields.
+        """
+        if blacklist is None:
+            blacklist = []
+        return [
+            name for name, field in cls.model_fields.items() if field if field.is_required() and name not in blacklist
+        ]
+
+    @classmethod
+    def _prepare_operation(
+        cls,
+        value: str | None = None,
+        index: GlobalSecondaryIndex | LocalSecondaryIndex | None = None,
+        range_key_condition: ComparisonCondition | None = None,
+        filter_condition: ComparisonCondition | None = None,
+        attributes_to_get: List[str] | None = None,
+    ):
+        params: QueryInputRequestTypeDef = {}
+
+        expression: ComparisonCondition = (
+            (K(cls.__hash_key__).eq(value) & range_key_condition)
+            if range_key_condition
+            else K(cls.__hash_key__).eq(value)
+        )
+
+        if index:
+            if index in cls.__gsi__ + cls.__lsi__:
+                params["IndexName"] = index.index_name
+                expression = (
+                    (K(index.hash_key).eq(value) & range_key_condition)
+                    if range_key_condition
+                    else K(index.hash_key).eq(value)
+                )
+            else:
+                raise InvalidStateError("Index provided but index does not exist for model.")
+
+        params["KeyConditionExpression"] = expression
+
+        if filter_condition:
+            params["FilterExpression"] = filter_condition
+
+        if attributes_to_get and len(attributes_to_get) > 0:
+            keys = [cls.__hash_key__]
+            if cls.__range_key__:
+                keys.append(cls.__range_key__)
+            params["ProjectionExpression"] = ", ".join(keys + cls._required_fields() + attributes_to_get)
+
+        return params
+
+    @classmethod
+    def _return_value(cls, item: dict) -> T:
+        return cls(**cls.deserialize(item))
 
     @classmethod
     def _build_expression(cls, condition_expression: ConditionBase):
@@ -371,53 +483,12 @@ class Dynamantic(_TableMetadata, BaseModel):
         return args
 
     def serialize(self) -> dict:
-        # pylint: disable=R0912
-        def _dynamo_type(val):
-            if isinstance(val, Binary):
-                return Binary(val)
-            if isinstance(val, float):
-                return Decimal(val)
-            if isinstance(val, (datetime, date, time)):
-                return val.isoformat()
-            if isinstance(val, dict):
-                return _serialize_map(val)
-            return val
-
-        def _serialize_map(values: dict):
-            for k in values.keys():
-                v = values[k]
-                if isinstance(v, float):
-                    v = Decimal(v)
-                if isinstance(v, (datetime, date, time)):
-                    v = v.isoformat()
-                if isinstance(v, dict):
-                    _serialize_map(v)
-                if isinstance(v, (tuple, frozenset)):
-                    # convert to list, which will be serialized next
-                    v = list(v)
-                if isinstance(v, set):
-                    new_set = set()
-                    for val in v:
-                        new_set.add(_dynamo_type(val))
-                    # convert to list, which will be serialized next
-                    v = list(new_set)
-                if isinstance(v, list):
-                    for x, val in enumerate(v):
-                        if isinstance(val, (float, datetime, date, time)):
-                            v[x] = _dynamo_type(val)
-                        if isinstance(val, dict):
-                            _serialize_map(val)
-                if isinstance(v, Dynamantic):
-                    _serialize_map(v.model_dump())
-                values[k] = v
-
         values = self.model_dump()
-        _serialize_map(values)
-
+        serialize_map(values)
         return {key: value for key, value in values.items() if value is not None}
 
     @classmethod
-    def deserialize(cls, values: dict) -> "Dynamantic":
+    def deserialize(cls, values: dict) -> Dict[str, Any]:
         def _create_instance(value, class_, collection_class=None):
             if value == None:
                 return value
@@ -462,3 +533,33 @@ class Dynamantic(_TableMetadata, BaseModel):
             updated_value = _deserialize_value(v, unique_classes)
             values[k] = updated_value
         return values
+
+
+class _DynamanticFuture(Generic[T]):
+    """
+    A placeholder object for a model that does not exist yet
+    """
+
+    _model: T
+    _model_cls: T
+    _resolved: bool
+
+    def __init__(self, model_cls: Type[T]) -> None:
+        self._model_cls = model_cls
+        self._model: T = None
+        self._resolved = False
+
+    def from_raw_data(self, item: Dict[str, Any]) -> None:
+        self._model = self._model_cls(**self._model_cls.deserialize(item))
+        self._resolved = True
+
+    def model_dump(self) -> Dict[str, Any]:
+        return self._model.model_dump()
+
+    def refresh(self) -> T:
+        """Return the model instance .
+
+        Returns:
+            T: [description]
+        """
+        return self._model

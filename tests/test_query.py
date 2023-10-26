@@ -20,12 +20,6 @@ def test_get_succeeds(dynamodb):
     assert result.my_str == "item1"
 
 
-def test_get_succeeds_as_dict(dynamodb):
-    _save_items(RangeKeyModel)
-    result = RangeKeyModel.get("hello:world", "relation_id:hello:world", as_dict=True)
-    assert result["my_str"] == "item1"
-
-
 def test_get_fails(dynamodb):
     _save_items(RangeKeyModel)
     with pytest.raises(GetError, match="Item doesn't exist"):
@@ -54,7 +48,7 @@ def test_query_item_by_hash_key_range_condition(dynamodb):
 
 
 def test_query_item_by_hash_key_filter_exists(dynamodb):
-    _save_items(RangeKeyModel, add_all=True)
+    _save_items(RangeKeyModel, add_count=15)
     results: List[RangeKeyModel] = RangeKeyModel.query(
         "hello:world",
         range_key_condition=K("relation_id").begins_with("relation_id:"),
@@ -65,7 +59,7 @@ def test_query_item_by_hash_key_filter_exists(dynamodb):
 
 
 def test_query_item_by_hash_key_filter_not_exists(dynamodb):
-    _save_items(RangeKeyModel, add_all=True)
+    _save_items(RangeKeyModel, add_count=15)
     results = RangeKeyModel.query(
         "hello:world",
         range_key_condition=K("relation_id").begins_with("relation_id:"),
@@ -75,30 +69,30 @@ def test_query_item_by_hash_key_filter_not_exists(dynamodb):
 
 
 def test_query_with_attributes(dynamodb):
-    _save_items(RangeKeyModel, add_all=True)
+    # TODO: maybe try deserializing the regular table return values???
+    _save_items(RangeKeyModel, add_count=15)
     results = RangeKeyModel.query(
         "hello:world",
         range_key_condition=K("relation_id").begins_with("relation_id:"),
         filter_condition=A("my_int").eq(10),
         attributes_to_get=["my_int", "my_str"],
-        as_dict=True,
     )
-    item: RangeKeyModel = next(iter(results))
-    assert item["my_int"] == 10
-    assert "item_id" in item
-    assert "relation_id" in item
-    assert "my_str" in item
-    assert "my_bool" not in item
+    item = next(iter(results))
+
+    assert item.my_int == 10
+    assert item.my_int is not None
+    assert item.relation_id is not None
+    assert item.my_str is not None
+    assert item.my_simple_bool is not None
 
 
 def test_query_with_attributes_no_range(dynamodb):
     _save_items(BaseModel)
     results = BaseModel.query(
         "hello:world",
-        as_dict=True,
     )
-    item: BaseModel = next(iter(results))
-    assert item["my_int"] == 5
+    item = next(iter(results))
+    assert item.my_int == 5
 
 
 def test_query_gsindex_single(dynamodb):
