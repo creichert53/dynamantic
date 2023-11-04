@@ -1,41 +1,18 @@
 import os
-import enum
 import datetime
 from uuid import uuid4
 from decimal import Decimal
-from typing import Any, List, Optional, Set, FrozenSet, Type, NamedTuple, TypedDict, TypeVar, Generic
-
-import pytest
-from pytest import Config
-
-import boto3
-from moto import mock_dynamodb
+from typing import Any, List, Optional, Set, FrozenSet, Type
 
 from pydantic import Field
-from dynamantic import Dynamantic, GlobalSecondaryIndex, LocalSecondaryIndex
-from dynamantic.main import T
 from dotenv import load_dotenv
 
+import boto3
+from boto3.dynamodb.conditions import Attr as A, Key as K
+from dynamantic import Dynamantic, GlobalSecondaryIndex, LocalSecondaryIndex
+from dynamantic.main import T
+
 load_dotenv(".env.test")
-
-
-def pytest_configure(config: Config):
-    load_dotenv(".env.test")
-
-
-@pytest.fixture(scope="function")
-def aws_credentials():
-    """Mocked AWS Credentials for moto."""
-    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-    os.environ["AWS_SESSION_TOKEN"] = "testing"
-    os.environ["AWS_DEFAULT_REGION"] = "us-east-2"
-
-
-@pytest.fixture(scope="function")
-def dynamodb(aws_credentials):
-    with mock_dynamodb():
-        yield boto3.client("dynamodb")
 
 
 class MyDeepNestedModel(Dynamantic):
@@ -53,7 +30,7 @@ class BaseModel(Dynamantic):
     __table_region__ = os.getenv("AWS_REGION")
     __aws_secret_access_key__ = os.getenv("AWS_SECRET_ACCESS_KEY")
     __aws_access_key_id__ = os.getenv("AWS_ACCESS_KEY_ID")
-    __aws_session_token__ = os.getenv("AWS_SESSION_TOKEN")
+    __aws_session_token__ = os.getenv("AWS_SECURITY_TOKEN")
 
     __hash_key__ = "item_id"
 
@@ -63,9 +40,6 @@ class BaseModel(Dynamantic):
     my_simple_bool: bool
     my_simple_bytes: bytes
     my_simple_str: str
-    my_required_str_list: List[str]
-    my_required_nested_model: MyNestedModel
-    my_required_nested_model_list: List[MyNestedModel]
 
     my_tuple: Optional[tuple] = None
     my_frozenset: Optional[FrozenSet[float]] = None
@@ -91,7 +65,6 @@ class BaseModel(Dynamantic):
     my_str_list: Optional[List[str]] = None
     my_int_list: Optional[List[int]] = None
     my_bool_list: Optional[List[bool]] = None
-    my_bytes_list: Optional[List[bytes]] = None
     my_dict: Optional[dict] = None
     my_nested_data: Optional[Any] = None
     my_nested_model: Optional[MyNestedModel] = None
@@ -103,6 +76,7 @@ class LocalHostModel(BaseModel):
 
 
 class RangeKeyModel(BaseModel):
+    __table_host__ = "http://localhost:8000"
     __range_key__ = "relation_id"
 
 
@@ -133,9 +107,6 @@ def _create_item_raw(DynamanticModel: Type[T] = None, **kwargs) -> T:
         "my_simple_bool": True,
         "my_simple_bytes": b"foo",
         "my_simple_str": "foo",
-        "my_required_str_list": ["a", "b", "c", "d"],
-        "my_required_nested_model": MyNestedModel(sample_field="foobar"),
-        "my_required_nested_model_list": [MyNestedModel(sample_field="foobar")],
         "my_tuple": (2.5, "foobar"),
         "my_frozenset": frozenset({2.0, 3.0, 4.0}),
         "my_int": 5,
@@ -148,13 +119,12 @@ def _create_item_raw(DynamanticModel: Type[T] = None, **kwargs) -> T:
         "my_time": datetime.time(0, 0, 0),
         "my_decimal": Decimal("1.5"),
         "my_str_set": {"a", "b", "c"},
-        "my_bytes_set": {b"hello", b"world", b"foobar"},
+        "my_bytes_set": {b"a", b"b", b"c"},
         "my_int_set": {1, 2},
         "my_float_list": [1.0, 2.0],
         "my_str_list": ["a", "b", "c", "d"],
         "my_int_list": [10, 20, 30],
         "my_bool_list": [True, False],
-        "my_bytes_list": [b"hello", b"world", b"foobar"],
         "my_dict": {"a": 1, "b": 2, "c": 3},
         "my_nested_data": [{"a": [{"foo": "bar"}], "b": "test"}, "some_string"],
         "my_nested_model": MyNestedModel(sample_field="hello"),
@@ -177,7 +147,10 @@ def _create_item_raw(DynamanticModel: Type[T] = None, **kwargs) -> T:
 def _create_item(DynamanticModel: Type[T], **kwargs) -> T:
     tables = DynamanticModel._dynamodb().list_tables()["TableNames"]
     if DynamanticModel.__table_name__ not in tables:
+        print("TABLE DOESNT EXIST")
         DynamanticModel.create_table()
+    else:
+        print("TABLE DOES EXIST")
     return _create_item_raw(DynamanticModel, **kwargs)
 
 
@@ -217,19 +190,12 @@ def _save_items(DynamanticModel, add_count: int = None):
             item.save()
 
 
-@pytest.fixture
-def model_instance() -> Dynamantic | BaseModel:
-    return _create_item_raw()
-
-
-@pytest.fixture
-def serialized(dynamodb) -> dict:
-    instance = _create_item(BaseModel)
-    return instance.serialize()
-
-
-@pytest.fixture
-def deserialized(dynamodb) -> BaseModel:
-    item: BaseModel = _create_item(BaseModel)
-    item.save()
-    return item
+# _save_items(RangeKeyModel, add_count=3)
+results = RangeKeyModel.query(
+    "hello:world",
+    range_key_condition=K("relation_id").begins_with("relation_id:"),
+    filter_condition=A("my_int").eq(2),
+    attributes_to_get=["my_int", "my_str"],
+)
+item_ = next(iter(results))
+print(item_)

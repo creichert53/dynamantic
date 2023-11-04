@@ -6,6 +6,7 @@ from typing import Callable, List, Literal, Set, Type, Dict, Any, TypeVar, Gener
 from datetime import datetime, time, date
 
 import boto3
+
 from boto3.dynamodb.types import Binary, TypeSerializer
 from boto3.dynamodb.conditions import (
     ComparisonCondition,
@@ -14,7 +15,6 @@ from boto3.dynamodb.conditions import (
 )
 from botocore.client import ClientError
 from botocore.exceptions import BotoCoreError
-
 
 from pydantic import BaseModel
 
@@ -38,6 +38,25 @@ T = TypeVar("T", bound="Dynamantic")
 M = TypeVar("M", bound="_DynamanticFuture")
 
 
+def format_float(number: float):
+    dec = Decimal(number)
+    dec = dec.quantize(Decimal("0.0000000000"), rounding=ROUND_HALF_UP)
+    tup = dec.as_tuple()
+    delta = len(tup.digits) + tup.exponent
+    digits = "".join(str(d) for d in tup.digits)
+    if delta <= 0:
+        zeros = abs(tup.exponent) - len(tup.digits)
+        val = "0." + ("0" * zeros) + digits
+    else:
+        val = digits[:delta] + ("0" * tup.exponent) + "." + digits[delta:]
+    val = val.rstrip("0")
+    if val[-1] == ".":
+        val = val[:-1]
+    if tup.sign:
+        return "-" + val
+    return val
+
+
 def type_serialize(key: str, value) -> Dict[str, Dict[str, Any]]:
     return {key: TypeSerializer().serialize(dynamodb_compatible_value(value))}
 
@@ -46,8 +65,7 @@ def dynamodb_compatible_value(val):
     if isinstance(val, Binary):
         return Binary(val)
     if isinstance(val, float):
-        val = Decimal(val)
-        return val.quantize(Decimal("0.0000000000"), rounding=ROUND_HALF_UP)
+        return Decimal(format_float(val))
     if isinstance(val, (datetime, date, time)):
         return val.isoformat()
     if isinstance(val, dict):
@@ -59,6 +77,12 @@ def serialize_map(values: dict):
     for k in values.keys():
         v = values[k]
         original = v
+
+        # binary sets fail to deserialize when getting specific attributes in a query.
+        # The workaround is to convert to a binary list when writing to the database.
+        # It will still be deserialized back to a set upon query.
+        is_binary_set = False
+
         if isinstance(v, float):
             v = Decimal(v)
         if isinstance(v, (datetime, date, time)):
@@ -69,9 +93,12 @@ def serialize_map(values: dict):
             # convert to list, which will be serialized next, converted back at the end
             v = list(v)
         if isinstance(v, set):
-            new_set = set()
+            new_set = original.__class__()
             for val in v:
-                new_set.add(dynamodb_compatible_value(val))
+                val = dynamodb_compatible_value(val)
+                if isinstance(val, (Binary, bytes, bytearray)):
+                    is_binary_set = True
+                new_set.add(val)
             # convert to list, which will be serialized next, converted back at the end
             v = list(new_set)
         if isinstance(v, list):
@@ -80,7 +107,7 @@ def serialize_map(values: dict):
                     v[x] = dynamodb_compatible_value(val)
                 if isinstance(val, dict):
                     serialize_map(val)
-        if isinstance(original, (tuple, frozenset, set)):
+        if isinstance(original, (tuple, set, frozenset)) and not is_binary_set:
             v = original.__class__(v)
         if isinstance(v, Dynamantic):
             serialize_map(v.model_dump())
@@ -195,9 +222,7 @@ class Dynamantic(_TableMetadata, BaseModel):
             List[T]: List of model instances.
         """
         params = cls._prepare_operation(value, index, range_key_condition, filter_condition, attributes_to_get)
-        print(cls._dynamodb().scan(TableName=cls.__table_name__))
         result: QueryOutputTableTypeDef = cls._dynamodb_table().query(**params)
-        print(result)
         items = [cls._return_value(item) for item in result["Items"]]
         return items
 

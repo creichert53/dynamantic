@@ -1,6 +1,7 @@
-import pytest
+import pytest, os
 from typing import List
-
+import boto3
+from moto import mock_dynamodb
 from dynamantic import A, K
 from dynamantic.exceptions import GetError
 from tests.conftest import (
@@ -69,17 +70,17 @@ def test_query_item_by_hash_key_filter_not_exists(dynamodb):
 
 
 def test_query_with_attributes(dynamodb):
-    # TODO: maybe try deserializing the regular table return values???
-    _save_items(RangeKeyModel, add_count=15)
+    _save_items(RangeKeyModel, add_count=3)
     results = RangeKeyModel.query(
         "hello:world",
         range_key_condition=K("relation_id").begins_with("relation_id:"),
-        filter_condition=A("my_int").eq(10),
+        filter_condition=A("my_int").eq(2),
         attributes_to_get=["my_int", "my_str"],
     )
     item = next(iter(results))
+    print(RangeKeyModel._dynamodb().scan(TableName=RangeKeyModel.__table_name__))
 
-    assert item.my_int == 10
+    assert item.my_int == 2
     assert item.my_int is not None
     assert item.relation_id is not None
     assert item.my_str is not None

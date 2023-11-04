@@ -10,11 +10,12 @@ dependencies = [
     "pydantic>=2.4.2",
     "boto3>=1.28.63",
     "boto3-stubs[dynamodb]>=1.28.63",
+    "pydash>=7.0.6",
 ]
 
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+# [build-system]
+# requires = ["pdm-backend"]
+# build-backend = "pdm.backend"
 
 [tool.pdm.dev-dependencies]
 dev = [

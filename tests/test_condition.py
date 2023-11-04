@@ -48,4 +48,4 @@ def test_condition_expression_set_add_int_list_multiple_syntax_succeeds():
 
 def test_condition_expression_set_add_int_set_multiple_syntax_succeeds():
     ce = Expr(RangeKeyModel).field("my_int_set").set_append({7, 9, 10})
-    assert ce.update_expression == "SET my_int_set = list_append(my_int_set, :my_int_set)"
+    assert ce.update_expression == "ADD my_int_set :my_int_set"

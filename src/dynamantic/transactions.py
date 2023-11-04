@@ -2,8 +2,9 @@
 
 from typing import List, Any, Type, Dict
 
-from boto3.dynamodb.types import TypeSerializer, TypeDeserializer
 from mypy_boto3_dynamodb.type_defs import TransactGetItemTypeDef, TransactWriteItemTypeDef
+
+from boto3.dynamodb.types import TypeSerializer, TypeDeserializer
 
 from dynamantic.exceptions import TransactGetError, UpdateError
 from dynamantic.main import T, Dynamantic, _DynamanticFuture
@@ -83,6 +84,7 @@ class TransactWrite(Transact):
         if len(self._transactions) > 0:
             # need to get single instance of the boto3 client
             model: Dynamantic = next(iter(self._models))
+            print(self._transactions)
             model._dynamodb().transact_write_items(TransactItems=self._transactions)
 
 

@@ -130,7 +130,10 @@ def test_serializer_optional_str_set(serialized):
 
 # my_bytes_set: Optional[Set[bytes]] = None
 def test_serializer_optional_bytes_set(serialized):
-    assert serialized.get("my_bytes_set").__class__ == set
+    # binary sets fail to deserialize when getting specific attributes in a query.
+    # The workaround is to convert to a binary list when writing to the database.
+    # It will still be deserialized back to a set upon query.
+    assert serialized.get("my_bytes_set").__class__ == list
     assert next(iter(serialized.get("my_bytes_set"))).__class__ == bytes
 
 
