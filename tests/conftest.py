@@ -3,7 +3,7 @@ import enum
 import datetime
 from uuid import uuid4
 from decimal import Decimal
-from typing import Any, List, Optional, Set, FrozenSet, Type, NamedTuple, TypedDict, TypeVar, Generic
+from typing import Any, List, Optional, Set, FrozenSet, Type, Dict
 
 import pytest
 from pytest import Config
@@ -39,22 +39,30 @@ def dynamodb(aws_credentials):
 
 
 class MyDeepNestedModel(Dynamantic):
-    another_field_float_list: List[bytes]
+    another_field_bytes_list: List[bytes]
 
 
 class MyNestedModel(Dynamantic):
     sample_field: str
+    deep_nested_required: MyDeepNestedModel
     nested_bytes_list: Optional[List[bytes]] = None
     deep_nested: Optional[List[MyDeepNestedModel]] = None
+    nested_dict: Optional[dict] = None
 
 
-class BaseModel(Dynamantic):
+class NoFieldsModel(Dynamantic):
     __table_name__ = os.getenv("DYNAMO_DB_TABLE")
     __table_region__ = os.getenv("AWS_REGION")
     __aws_secret_access_key__ = os.getenv("AWS_SECRET_ACCESS_KEY")
     __aws_access_key_id__ = os.getenv("AWS_ACCESS_KEY_ID")
     __aws_session_token__ = os.getenv("AWS_SESSION_TOKEN")
 
+
+class SingleFieldModel(NoFieldsModel):
+    single_str: str
+
+
+class BaseModel(NoFieldsModel):
     __hash_key__ = "item_id"
 
     item_id: str = Field(default_factory=lambda: "test:" + str(uuid4()))
@@ -64,6 +72,8 @@ class BaseModel(Dynamantic):
     my_simple_bytes: bytes
     my_simple_str: str
     my_required_str_list: List[str]
+    my_required_str_set: Set[str]
+    my_required_dict: dict
     my_required_nested_model: MyNestedModel
     my_required_nested_model_list: List[MyNestedModel]
 
@@ -93,6 +103,7 @@ class BaseModel(Dynamantic):
     my_bool_list: Optional[List[bool]] = None
     my_bytes_list: Optional[List[bytes]] = None
     my_dict: Optional[dict] = None
+    my_dict_list: Optional[List[Dict]] = None
     my_nested_data: Optional[Any] = None
     my_nested_model: Optional[MyNestedModel] = None
     my_nested_model_list: Optional[List[MyNestedModel]] = None
@@ -134,8 +145,16 @@ def _create_item_raw(DynamanticModel: Type[T] = None, **kwargs) -> T:
         "my_simple_bytes": b"foo",
         "my_simple_str": "foo",
         "my_required_str_list": ["a", "b", "c", "d"],
-        "my_required_nested_model": MyNestedModel(sample_field="foobar"),
-        "my_required_nested_model_list": [MyNestedModel(sample_field="foobar")],
+        "my_required_str_set": {"a", "b", "c", "d"},
+        "my_required_dict": {"a": 1, "b": 2, "c": 3},
+        "my_required_nested_model": MyNestedModel(
+            sample_field="foobar", deep_nested_required=MyDeepNestedModel(another_field_bytes_list=[b"foobar"])
+        ),
+        "my_required_nested_model_list": [
+            MyNestedModel(
+                sample_field="foobar", deep_nested_required=MyDeepNestedModel(another_field_bytes_list=[b"foobar"])
+            )
+        ],
         "my_tuple": (2.5, "foobar"),
         "my_frozenset": frozenset({2.0, 3.0, 4.0}),
         "my_int": 5,
@@ -156,14 +175,20 @@ def _create_item_raw(DynamanticModel: Type[T] = None, **kwargs) -> T:
         "my_bool_list": [True, False],
         "my_bytes_list": [b"hello", b"world", b"foobar"],
         "my_dict": {"a": 1, "b": 2, "c": 3},
+        "my_dict_list": [{"a": 1, "b": 2}, {"c": 3}],
         "my_nested_data": [{"a": [{"foo": "bar"}], "b": "test"}, "some_string"],
-        "my_nested_model": MyNestedModel(sample_field="hello"),
+        "my_nested_model": MyNestedModel(
+            sample_field="hello", deep_nested_required=MyDeepNestedModel(another_field_bytes_list=[b"foobar"])
+        ),
         "my_nested_model_list": [
-            MyNestedModel(sample_field="world"),
+            MyNestedModel(
+                sample_field="world", deep_nested_required=MyDeepNestedModel(another_field_bytes_list=[b"foobar"])
+            ),
             MyNestedModel(
                 sample_field="foobar",
+                deep_nested_required=MyDeepNestedModel(another_field_bytes_list=[b"foobar"]),
                 nested_bytes_list=[b"foo", b"bar"],
-                deep_nested=[MyDeepNestedModel(another_field_float_list=[b"hello"])],
+                deep_nested=[MyDeepNestedModel(another_field_bytes_list=[b"hello"])],
             ),
         ],
     }

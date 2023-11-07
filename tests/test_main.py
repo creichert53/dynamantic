@@ -1,6 +1,12 @@
 import datetime
+import pytest
 from decimal import Decimal
-from tests.conftest import BaseModel, MyNestedModel
+
+from boto3.dynamodb.types import Binary
+
+from dynamantic.exceptions import TableError
+from dynamantic.main import format_float, dynamodb_compatible_value, serialize_map
+from tests.conftest import BaseModel, MyNestedModel, SingleFieldModel
 
 
 def test_pydantic_serialize(model_instance: BaseModel):
@@ -8,13 +14,54 @@ def test_pydantic_serialize(model_instance: BaseModel):
     assert isinstance(serialized, dict)
 
 
+def test_format_float():
+    assert format_float(0) == "0"
+
+
+def test_binary():
+    assert dynamodb_compatible_value(Binary(b"hello")) == Binary(b"hello")
+
+
+def test_model_serialize():
+    assert serialize_map({"map": SingleFieldModel(single_str="hello")}) == {"map": {"single_str": "hello"}}
+
+
+#
+# ████████╗ █████╗ ██████╗ ██╗     ███████╗     ██████╗ ██████╗ ███████╗██████╗  █████╗ ████████╗██╗ ██████╗ ███╗   ██╗███████╗
+# ╚══██╔══╝██╔══██╗██╔══██╗██║     ██╔════╝    ██╔═══██╗██╔══██╗██╔════╝██╔══██╗██╔══██╗╚══██╔══╝██║██╔═══██╗████╗  ██║██╔════╝
+#    ██║   ███████║██████╔╝██║     █████╗      ██║   ██║██████╔╝█████╗  ██████╔╝███████║   ██║   ██║██║   ██║██╔██╗ ██║███████╗
+#    ██║   ██╔══██║██╔══██╗██║     ██╔══╝      ██║   ██║██╔═══╝ ██╔══╝  ██╔══██╗██╔══██║   ██║   ██║██║   ██║██║╚██╗██║╚════██║
+#    ██║   ██║  ██║██████╔╝███████╗███████╗    ╚██████╔╝██║     ███████╗██║  ██║██║  ██║   ██║   ██║╚██████╔╝██║ ╚████║███████║
+#    ╚═╝   ╚═╝  ╚═╝╚═════╝ ╚══════╝╚══════╝     ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝
+#
+#
+
+
+def test_create_table_succeeds(dynamodb):
+    BaseModel.create_table()
+    assert BaseModel.__table_name__ in BaseModel._dynamodb().list_tables()["TableNames"]
+
+
+def test_create_table_duplicate_fails(dynamodb):
+    with pytest.raises(TableError, match="Failed to create table.*"):
+        BaseModel.create_table()
+        BaseModel.create_table()
+
+
+def test_delete_table_succeeds(dynamodb):
+    BaseModel.create_table()
+    assert BaseModel.__table_name__ in BaseModel._dynamodb().list_tables()["TableNames"]
+    BaseModel.delete_table()
+    assert BaseModel.__table_name__ not in BaseModel._dynamodb().list_tables()["TableNames"]
+
+
 #
 # ████████╗██╗   ██╗██████╗ ███████╗███████╗
 # ╚══██╔══╝╚██╗ ██╔╝██╔══██╗██╔════╝██╔════╝
-#   ██║    ╚████╔╝ ██████╔╝█████╗  ███████╗
-#   ██║     ╚██╔╝  ██╔═══╝ ██╔══╝  ╚════██║
-#   ██║      ██║   ██║     ███████╗███████║
-#   ╚═╝      ╚═╝   ╚═╝     ╚══════╝╚══════╝
+#    ██║    ╚████╔╝ ██████╔╝█████╗  ███████╗
+#    ██║     ╚██╔╝  ██╔═══╝ ██╔══╝  ╚════██║
+#    ██║      ██║   ██║     ███████╗███████║
+#    ╚═╝      ╚═╝   ╚═╝     ╚══════╝╚══════╝
 #
 #
 
@@ -33,6 +80,14 @@ def test_pydantic_type_str_set():
 
 def test_pydantic_type_decimal():
     assert Decimal in BaseModel._pydantic_types("my_decimal")
+
+
+def test_pydantic_type_frozenset():
+    assert frozenset in BaseModel._pydantic_types("my_frozenset")
+
+
+def test_pydantic_type_dict():
+    assert dict in BaseModel._pydantic_types("my_dict_list")
 
 
 #

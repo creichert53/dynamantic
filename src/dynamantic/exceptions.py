@@ -179,6 +179,16 @@ class InvalidStateError(DynamanticException):
     msg = "Operation in invalid state"
 
 
+class AttributeInvalidError(TypeError):
+    """
+    Raised when attribute type is invalid
+    """
+
+    def __init__(self, name: str = ""):
+        msg = f"Attribute: [{name}] not allowed."
+        super().__init__(msg)
+
+
 class AttributeTypeInvalidError(TypeError):
     """
     Raised when attribute type is invalid

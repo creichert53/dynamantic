@@ -38,7 +38,7 @@ T = TypeVar("T", bound="Dynamantic")
 M = TypeVar("M", bound="_DynamanticFuture")
 
 
-def format_float(number: float):
+def format_float(number: float) -> str:
     dec = Decimal(number)
     dec = dec.quantize(Decimal("0.0000000000"), rounding=ROUND_HALF_UP)
     tup = dec.as_tuple()
@@ -62,14 +62,20 @@ def type_serialize(key: str, value) -> Dict[str, Dict[str, Any]]:
 
 
 def dynamodb_compatible_value(val):
+    if isinstance(val, frozenset):
+        val = set(val)
+    if isinstance(val, set):
+        return serialize_map({"set": val})["set"]
     if isinstance(val, Binary):
-        return Binary(val)
+        return val
     if isinstance(val, float):
         return Decimal(format_float(val))
     if isinstance(val, (datetime, date, time)):
         return val.isoformat()
     if isinstance(val, dict):
         return serialize_map(val)
+    if issubclass(val.__class__, BaseModel):
+        return val.model_dump()
     return val
 
 
@@ -109,9 +115,10 @@ def serialize_map(values: dict):
                     serialize_map(val)
         if isinstance(original, (tuple, set, frozenset)) and not is_binary_set:
             v = original.__class__(v)
-        if isinstance(v, Dynamantic):
-            serialize_map(v.model_dump())
+        if issubclass(v.__class__, BaseModel):
+            v = serialize_map(v.model_dump())
         values[k] = v
+    return values
 
 
 class _TableMetadata:
@@ -442,10 +449,11 @@ class Dynamantic(_TableMetadata, BaseModel):
     def _pydantic_types(cls, key: str) -> Set[Type]:
         def traverse(options, full_set: set):
             for option in options:
-                if set == typing.get_origin(option):
-                    full_set.add(set)
+                print(option, typing.get_origin(option))
                 if frozenset == typing.get_origin(option):
                     full_set.add(frozenset)
+                if set == typing.get_origin(option):
+                    full_set.add(set)
                 if list == typing.get_origin(option):
                     full_set.add(list)
                 if dict == typing.get_origin(option):
@@ -515,36 +523,32 @@ class Dynamantic(_TableMetadata, BaseModel):
     @classmethod
     def deserialize(cls, values: dict) -> Dict[str, Any]:
         def _create_instance(value, class_, collection_class=None):
+            # if the class fails to deserialize, it is because the value was changed in DynamoDB
+            # and is no longer compatible
             if value == None:
                 return value
 
-            try:
-                if class_ in (datetime, date, time):
-                    return class_.fromisoformat(value)
-                if collection_class in (list, tuple, frozenset):
-                    new_list = []
-                    for val in value:
-                        new_list.append(_create_instance(val, class_))
-                    return collection_class(new_list)
-                if collection_class == set:
-                    new_set = set()
-                    for val in iter(value):
-                        new_set.add(_create_instance(val, class_))
-                    return new_set
-                if issubclass(class_, Dynamantic):
-                    deserialized = class_.deserialize(value)
-                    return class_(**deserialized)
-                return class_(value)
-            except Exception as ex:
-                print(ex)
-                return value
+            if class_ in (datetime, date, time):
+                return class_.fromisoformat(value)
+            if collection_class in (list, tuple, frozenset):
+                new_list = []
+                for val in value:
+                    new_list.append(_create_instance(val, class_))
+                return collection_class(new_list)
+            if collection_class == set:
+                new_set = set()
+                for val in iter(value):
+                    new_set.add(_create_instance(val, class_))
+                return new_set
+            if issubclass(class_, Dynamantic):
+                deserialized = class_.deserialize(value)
+                return class_(**deserialized)
+            return class_(value)
 
         def _deserialize_value(value, classes: list):
             if len(classes) == 1:
                 return _create_instance(value, classes[0])
-            if len(classes) == 2:
-                return _create_instance(value, classes[0], classes[1])
-            return value
+            return _create_instance(value, classes[0], classes[1])
 
         def _unique_classes_with_order(class_list):
             seen = set()

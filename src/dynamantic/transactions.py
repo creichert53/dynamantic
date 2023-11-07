@@ -84,7 +84,6 @@ class TransactWrite(Transact):
         if len(self._transactions) > 0:
             # need to get single instance of the boto3 client
             model: Dynamantic = next(iter(self._models))
-            print(self._transactions)
             model._dynamodb().transact_write_items(TransactItems=self._transactions)
 
 
