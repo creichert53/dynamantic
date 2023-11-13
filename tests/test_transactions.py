@@ -1,10 +1,9 @@
 import pytest
 import datetime
 
-from dynamantic.main import _DynamanticFuture
+from dynamantic.main import _DynamanticFuture, Expr
 from dynamantic.transactions import TransactGet, TransactWrite
 from dynamantic.exceptions import TransactGetError, UpdateError, AttributeTypeInvalidError, AttributeInvalidError
-from dynamantic.expressions import Expr
 
 from tests.conftest import BaseModel, RangeKeyModel, MyNestedModel, MyDeepNestedModel, _save_items, _create_item
 

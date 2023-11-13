@@ -171,6 +171,51 @@ class TransactGetError(DynamanticException):
         return self.cause.cancellation_reasons
 
 
+class BatchWriteError(DynamanticException):
+    """
+    Raised when a BatchWrite operation fails
+    """
+
+    @property
+    def cancellation_reasons(self) -> List[Optional[CancellationReason]]:
+        """
+        When :attr:`.cause_response_code` is ``BatchCanceledException``, this property lists
+        cancellation reasons in the same order as the batchion items (one-to-one).
+        Items which were not part of the reason for cancellation would have :code:`None` as the value.
+
+        For a list of possible cancellation reasons and their semantics,
+        see `BatchWriteItems`_ in the AWS documentation.
+
+        .. _BatchWriteItems:
+            https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_BatchWriteItems.html
+        """
+        if not isinstance(self.cause, VerboseClientError):
+            return []
+        return self.cause.cancellation_reasons
+
+
+class BatchGetError(DynamanticException):
+    """
+    Raised when a BatchGet operation fails
+    """
+
+    @property
+    def cancellation_reasons(self) -> List[Optional[CancellationReason]]:
+        """
+        When :attr:`.cause_response_code` is ``BatchCanceledException``, this property lists
+        cancellation reasons in the same order as the batchion items (one-to-one).
+        Items which were not part of the reason for cancellation would have :code:`None` as the value.
+
+        For a list of possible cancellation reasons and their semantics,
+        see `BatchGetItems`_ in the AWS documentation.
+
+        .. _BatchGetItems: https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_BatchGetItems.html
+        """
+        if not isinstance(self.cause, VerboseClientError):
+            return []
+        return self.cause.cancellation_reasons
+
+
 class InvalidStateError(DynamanticException):
     """
     Raises when the internal state of an operation context is invalid

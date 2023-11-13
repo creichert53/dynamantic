@@ -1,16 +1,8 @@
 import pytest
 
 from dynamantic.exceptions import InvalidStateError
-from dynamantic import A, K
-from tests.conftest import (
-    _save_items,
-    BaseModel,
-    RangeKeyModel,
-    GSI,
-    GSIModel,
-    LSI,
-    LSIModel,
-)
+from dynamantic import A
+from tests.conftest import _save_items, BaseModel, RangeKeyModel, GSI, GSIModel
 
 
 def test_scan_item_no_range(dynamodb):

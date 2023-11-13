@@ -1,7 +1,5 @@
-import pytest, os
+import pytest
 from typing import List
-import boto3
-from moto import mock_dynamodb
 from dynamantic import A, K
 from dynamantic.exceptions import GetError
 from tests.conftest import (

@@ -12,9 +12,10 @@ import boto3
 from moto import mock_dynamodb
 
 from pydantic import Field
+from dotenv import load_dotenv
+
 from dynamantic import Dynamantic, GlobalSecondaryIndex, LocalSecondaryIndex
 from dynamantic.main import T
-from dotenv import load_dotenv
 
 load_dotenv(".env.test")
 
@@ -117,6 +118,12 @@ class RangeKeyModel(BaseModel):
     __range_key__ = "relation_id"
 
 
+class RangeKeyModelTable2(RangeKeyModel):
+    __table_name__ = os.getenv("DYNAMO_DB_TABLE") + "-secondary"
+
+    extra_arg: int
+
+
 GSI = GlobalSecondaryIndex(
     index_name=os.getenv("DYNAMO_DB_TABLE") + "-gsi",
     hash_key="my_str",
@@ -206,30 +213,25 @@ def _create_item(DynamanticModel: Type[T], **kwargs) -> T:
     return _create_item_raw(DynamanticModel, **kwargs)
 
 
-def _save_items(DynamanticModel, add_count: int = None):
+def _save_items(DynamanticModel: Type[T], add_count: int = None, **kwargs) -> List[T]:
+    all_items = []
+
     item1: DynamanticModel = _create_item(
-        DynamanticModel,
-        item_id="hello:world",
-        relation_id="relation_id:hello:world",
-        my_str="item1",
+        DynamanticModel, item_id="hello:world", relation_id="relation_id:hello:world", my_str="item1", **kwargs
     )
     item1.save()
 
     item2: DynamanticModel = _create_item(
-        DynamanticModel,
-        item_id="foo:bar",
-        relation_id="relation_id:foo:bar",
-        my_str="item2",
+        DynamanticModel, item_id="foo:bar", relation_id="relation_id:foo:bar", my_str="item2", **kwargs
     )
     item2.save()
 
     item3: DynamanticModel = _create_item(
-        DynamanticModel,
-        item_id="hello:world",
-        relation_id="relation_id:foo:bar",
-        my_str="item2",
+        DynamanticModel, item_id="hello:world", relation_id="relation_id:foo:bar", my_str="item2", **kwargs
     )
     item3.save()
+
+    all_items.extend([item1, item2, item3])
 
     if add_count is not None:
         for x in range(add_count):
@@ -240,6 +242,9 @@ def _save_items(DynamanticModel, add_count: int = None):
                 my_int=x,
             )
             item.save()
+            all_items.append(item)
+
+    return all_items
 
 
 @pytest.fixture

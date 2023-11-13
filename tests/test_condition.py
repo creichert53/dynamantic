@@ -1,7 +1,7 @@
 import pytest
 import datetime
 
-from dynamantic.expressions import Expr
+from dynamantic.main import Expr
 from dynamantic.exceptions import AttributeTypeInvalidError, AttributeInvalidError
 from tests.conftest import RangeKeyModel
 

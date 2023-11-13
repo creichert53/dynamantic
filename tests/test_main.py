@@ -5,7 +5,8 @@ from decimal import Decimal
 from boto3.dynamodb.types import Binary
 
 from dynamantic.exceptions import TableError
-from dynamantic.main import format_float, dynamodb_compatible_value, serialize_map
+from dynamantic.types import format_float, dynamodb_compatible_value, serialize_map
+
 from tests.conftest import BaseModel, MyNestedModel, SingleFieldModel
 
 
