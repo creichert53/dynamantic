@@ -7,7 +7,7 @@ from boto3.dynamodb.types import Binary
 from dynamantic.exceptions import TableError
 from dynamantic.types import format_float, dynamodb_compatible_value, serialize_map
 
-from tests.conftest import BaseModel, MyNestedModel, SingleFieldModel
+from tests.conftest import BaseModel, MyNestedModel, SingleFieldModel, EnumField
 
 
 def test_pydantic_serialize(model_instance: BaseModel):
@@ -113,6 +113,10 @@ def test_serializer_frozenset(serialized):
 
 
 # my_enum: enum.Enum
+def test_serializer_enum(serialized):
+    assert serialized.get("my_enum").__class__ == str
+
+
 # my_int_enum: enum.IntEnum
 # my_named_tuple: NamedTuple
 # my_typed_dict: TypedDict
@@ -258,6 +262,11 @@ def test_deserialzer_tuple(deserialized: BaseModel):
 # my_frozenset: frozenset
 def test_deserialzer_frozenset(deserialized: BaseModel):
     assert deserialized.my_frozenset.__class__ == frozenset
+
+
+# my_enum: enum
+def test_deserialzer_enum(deserialized: BaseModel):
+    assert deserialized.my_enum.__class__ == EnumField
 
 
 # my_simple_bool: bool

@@ -1,6 +1,6 @@
 import os
-import enum
 import datetime
+from enum import Enum
 from uuid import uuid4
 from decimal import Decimal
 from typing import Any, List, Optional, Set, FrozenSet, Type, Dict
@@ -37,6 +37,11 @@ def aws_credentials():
 def dynamodb(aws_credentials):
     with mock_dynamodb():
         yield boto3.client("dynamodb")
+
+
+class EnumField(Enum):
+    ONE = "ONE"
+    TWO = "TWO"
 
 
 class MyDeepNestedModel(Dynamantic):
@@ -80,7 +85,7 @@ class BaseModel(NoFieldsModel):
 
     my_tuple: Optional[tuple] = None
     my_frozenset: Optional[FrozenSet[float]] = None
-    # my_enum: enum.Enum
+    my_enum: EnumField = None
     # my_int_enum: enum.IntEnum
     # my_named_tuple: NamedTuple
     # my_typed_dict: TypedDict
@@ -164,6 +169,7 @@ def _create_item_raw(DynamanticModel: Type[T] = None, **kwargs) -> T:
         ],
         "my_tuple": (2.5, "foobar"),
         "my_frozenset": frozenset({2.0, 3.0, 4.0}),
+        "my_enum": EnumField.ONE,
         "my_int": 5,
         "my_float": 2.5,
         "my_str": "bar",

@@ -1,5 +1,6 @@
 import typing
 import inspect
+from enum import Enum
 from decimal import Decimal, ROUND_HALF_UP
 
 from typing import Dict, Any
@@ -119,6 +120,8 @@ def serialize_map(values: dict):
                     serialize_map(val)
         if isinstance(original, (tuple, set, frozenset)) and not is_binary_set:
             v = original.__class__(v)
+        if isinstance(v, Enum):
+            v = v.value
         if issubclass(v.__class__, BaseModel):
             v = serialize_map(v.model_dump())
         values[k] = v

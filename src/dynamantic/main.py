@@ -421,6 +421,8 @@ class Dynamantic(_TableMetadata, BaseModel):
 
     @classmethod
     def _pydantic_types(cls, key: str) -> Set[Type]:
+        print(key)
+
         def traverse(options, full_set: set):
             for option in options:
                 if frozenset == typing.get_origin(option):
