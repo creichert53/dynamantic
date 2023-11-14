@@ -232,6 +232,13 @@ class Dynamantic(_TableMetadata, BaseModel):
         return self
 
     @classmethod
+    def table_exists(cls):
+        tables = cls._dynamodb().list_tables()["TableNames"]
+        if cls.__table_name__ in tables:
+            return True
+        return False
+
+    @classmethod
     def create_table(cls, wait: bool = True):
         # PROVISIONED THROUGHPUT
         throughput = {

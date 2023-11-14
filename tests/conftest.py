@@ -207,8 +207,7 @@ def _create_item_raw(DynamanticModel: Type[T] = None, **kwargs) -> T:
 
 
 def _create_item(DynamanticModel: Type[T], **kwargs) -> T:
-    tables = DynamanticModel._dynamodb().list_tables()["TableNames"]
-    if DynamanticModel.__table_name__ not in tables:
+    if not DynamanticModel.table_exists():
         DynamanticModel.create_table()
     return _create_item_raw(DynamanticModel, **kwargs)
 
