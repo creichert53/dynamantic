@@ -95,7 +95,7 @@ def serialize_map(values: dict):
         is_binary_set = False
 
         if isinstance(v, float):
-            v = Decimal(v)
+            v = dynamodb_compatible_value(v)
         if isinstance(v, (datetime, date, time)):
             v = v.isoformat()
         if isinstance(v, dict):

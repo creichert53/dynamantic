@@ -142,8 +142,6 @@ class Dynamantic(_TableMetadata, BaseModel):
         if condition_expression:
             payload["ConditionExpression"] = condition_expression
 
-        print(payload)
-
         try:
             self._dynamodb_table().delete_item(**payload)
         except BOTOCORE_EXCEPTIONS as exc:
@@ -421,8 +419,6 @@ class Dynamantic(_TableMetadata, BaseModel):
 
     @classmethod
     def _pydantic_types(cls, key: str) -> Set[Type]:
-        print(key)
-
         def traverse(options, full_set: set):
             for option in options:
                 if frozenset == typing.get_origin(option):

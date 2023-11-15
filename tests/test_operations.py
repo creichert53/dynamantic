@@ -15,6 +15,13 @@ def test_new_item(dynamodb):
     assert item.my_int == 6
 
 
+def test_new_item_float_succeeds(dynamodb):
+    item = _create_item(BaseModel)
+    item.my_float = 0.01
+    item.save()
+    assert item.my_float == 0.01
+
+
 def test_new_item_fails(dynamodb):
     item = _create_item(BaseModel)
     original_int = item.my_int
