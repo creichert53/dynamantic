@@ -1,6 +1,6 @@
 [project]
 name = "dynamantic"
-version = "0.2.0"
+version = "0.2.1"
 description = "A Pydantic ORM for DynamoDB on top of boto3."
 authors = [{ name = "chrisreichert53", email = "creichert.53@gmail.com" }]
 requires-python = ">=3.10"

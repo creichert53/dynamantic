@@ -114,8 +114,8 @@ class Dynamantic(_TableMetadata, BaseModel):
         return cls._return_value(item)
 
     @classmethod
-    def batch_get(cls: Type[T], items: List[str] | List[Tuple[str, str]]):
-        all_results = []
+    def batch_get(cls: Type[T], items: List[str] | List[Tuple[str, str]]) -> List[T]:
+        all_results: List[T] = []
         chunked = [items[i : i + 25] for i in range(0, len(items), 25)]
         for chunk in chunked:
             if cls.__hash_key__ and cls.__range_key__:
