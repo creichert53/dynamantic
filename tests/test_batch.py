@@ -96,3 +96,26 @@ def test_batch_get_many(dynamodb):
 
     assert futures[0].refresh().my_int == 5
     assert futures[99].refresh().my_int == 96  # 99 - 3 pre-created items
+
+
+def test_simple_batch_get_tuple_success(dynamodb):
+    _save_items(RangeKeyModel)
+    items = RangeKeyModel.batch_get([("hello:world", "relation_id:hello:world"), ("blah", "blah")])
+
+    assert len(items) == 1
+    assert items[0].my_int == 5
+
+
+def test_simple_batch_get_list_success(dynamodb):
+    _save_items(BaseModel)
+    items = BaseModel.batch_get(["foo:bar", "dne"])
+
+    assert len(items) == 1
+    assert items[0].my_int == 5
+
+
+def test_simple_batch_get_many(dynamodb):
+    all_items = _save_items(RangeKeyModel, add_count=100)
+    items = RangeKeyModel.batch_get([(item.item_id, item.relation_id) for item in all_items])
+    assert items[0].my_int == 5
+    assert items[99].my_int == 96  # 99 - 3 pre-created items

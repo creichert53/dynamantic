@@ -2,7 +2,7 @@
 import json
 import inspect
 import typing
-from typing import Callable, List, Literal, Set, Type, Dict, Any, TypeVar, Generic
+from typing import Callable, List, Literal, Set, Type, Dict, Any, TypeVar, Generic, Tuple
 from decimal import Decimal
 from datetime import datetime, time, date
 
@@ -112,6 +112,21 @@ class Dynamantic(_TableMetadata, BaseModel):
             raise GetError("Item doesn't exist.")
 
         return cls._return_value(item)
+
+    @classmethod
+    def batch_get(cls: Type[T], items: List[str] | List[Tuple[str, str]]):
+        all_results = []
+        chunked = [items[i : i + 25] for i in range(0, len(items), 25)]
+        for chunk in chunked:
+            if cls.__hash_key__ and cls.__range_key__:
+                request = {cls.__table_name__: {"Keys": [cls._key(key[0], key[1]) for key in chunk]}}
+            else:
+                request = {cls.__table_name__: {"Keys": [cls._key(key) for key in chunk]}}
+            results = cls._dynamodb().batch_get_item(RequestItems=request)["Responses"][cls.__table_name__]
+            for item in results:
+                item = {k: TypeDeserializer().deserialize(v) for k, v in item.items()}
+                all_results.append(cls(**cls.deserialize(item)))
+        return all_results
 
     def update(self, actions: List["ConditionExpression"], condition_expression: ComparisonCondition | None = None):
         last_action_type, all_actions, all_attribute_values = self._update(actions)
@@ -550,6 +565,13 @@ class Dynamantic(_TableMetadata, BaseModel):
             all_attribute_values = all_attribute_values | action.expression_attribute_values
 
         return last_action_type, all_actions, all_attribute_values
+
+    @classmethod
+    def _key(cls, hash_key: Any, range_key: Any = None) -> Dict[str, Any]:
+        key = {cls.__hash_key__: {cls._dynamodb_type(cls.__hash_key__): hash_key}}
+        if range_key:
+            key[cls.__range_key__] = {cls._dynamodb_type(cls.__range_key__): range_key}
+        return key
 
     def _key_params(self) -> Dict[str, str | float | int | Decimal | Binary]:
         params = {}

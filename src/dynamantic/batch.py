@@ -68,14 +68,8 @@ class BatchWrite(BatchContext):
 class BatchGet(BatchContext):
     _operations: List[Tuple[str, BatchGetItemInputRequestTypeDef]] = []
 
-    def _key(self, model: Type[T], hash_key: Any, range_key: Any = None) -> Dict[str, Any]:
-        key = {model.__hash_key__: {model._dynamodb_type(model.__hash_key__): hash_key}}
-        if range_key:
-            key[model.__range_key__] = {model._dynamodb_type(model.__range_key__): range_key}
-        return key
-
     def get(self, model: Type[T], hash_key: Any, range_key: Any = None) -> _DynamanticFuture[T]:
-        key = self._key(model, hash_key, range_key)
+        key = model._key(hash_key, range_key)
         self._operations.append((model.__table_name__, key))
         return self._add_model(model)
 
