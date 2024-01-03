@@ -1,13 +1,13 @@
 [project]
 name = "dynamantic"
-version = "0.2.1"
+version = "0.2.2"
 description = "A Pydantic ORM for DynamoDB on top of boto3."
 authors = [{ name = "chrisreichert53", email = "creichert.53@gmail.com" }]
 requires-python = ">=3.10"
 readme = "README.md"
 license = { text = "MIT" }
 dependencies = [
-    "pydantic>=2.5.0",
+    "pydantic>=2.5.3",
     "boto3>=1.28.63",
     "boto3-stubs[dynamodb]>=1.28.63",
 ]
